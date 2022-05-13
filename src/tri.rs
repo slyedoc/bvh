@@ -10,12 +10,11 @@ pub struct Tri {
 
 impl Tri {
     pub fn new(v0: Vec3, v1: Vec3, v2: Vec3) -> Self {
-        let centroid = (v0 + v1 + v2) * 0.3333f32;
         Tri {
             vertex0: v0,
             vertex1: v1,
             vertex2: v2,
-            centroid,
+            centroid: (v0 + v1 + v2) / 3.0,  // * 0.3333f32
         }
     }
 }

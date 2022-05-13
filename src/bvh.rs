@@ -1,74 +1,56 @@
 use glam::Vec3;
+use image::imageops::FilterType::Triangle;
 
-use crate::{N, tri::Tri, ray::Ray};
+use crate::{ray::Ray, tri::Tri};
 
-
-#[derive(Default, Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone)]
 pub struct BvhNode {
-    aabb_min: Vec3, // 12
-    aabb_max: Vec3, // 12
+    aabb_min: Vec3,
+    aabb_max: Vec3,
     left_child: u32,
-    right_child: u32,
-    //isLeaf: bool,
-    first_triangle: u32,
-    triangle_count: u32,
+    first_tri_index: u32,
+    tri_count: u32,
 }
 
 impl BvhNode {
     pub fn is_leaf(&self) -> bool {
-        self.triangle_count > 0
+        self.tri_count != 0
     }
 }
 
-
 pub struct Bvh {
-    pub nodesUsed: u32,
-    pub nodes: [BvhNode; N * 2 - 1],
-    pub triangle_count: usize,
-    pub triangles: [Tri; N],
-    pub triangle_indexs: [usize; N],
+    pub nodes: Vec<BvhNode>,
+    pub open_node: usize,
+    pub triangle_indexs: Vec<usize>,
 }
 
 impl Bvh {
-    pub fn new() -> Self {
-        Bvh {
-            
-            triangles: [Tri::default(); N],
-            triangle_indexs: [0; N],
-            nodesUsed: 1,
-            triangle_count: 0, // 0 will be root
-            nodes: [BvhNode::default(); N * 2 - 1],
+    pub fn new(size: usize) -> Self {
+        Self {
+            nodes: vec![BvhNode::default(); size * 2],
+            open_node: 2,
+            triangle_indexs: (0..size).collect::<Vec<_>>(),
         }
     }
 
     /// Builds a BVH from a list of triangles added
-    pub fn setup(&mut self) {
-        let mut root = &mut self.nodes[0];
+    pub fn setup(&mut self, triangles: &Vec<Tri>) {
+        let root = &mut self.nodes[0];
         root.left_child = 0;
-        root.right_child = 0;
-        root.first_triangle = 0;
+        root.first_tri_index = 0;
+        root.tri_count = triangles.len() as u32;
 
-        root.triangle_count = self.triangle_count as u32; // N
-
-        self.update_node_bounds(0);
-        // subdivide recursively
-        self.subdivide_node(0);
+        self.update_node_bounds(0, triangles);
+        self.subdivide_node(0, triangles);
     }
 
-    pub fn add_triangle(&mut self, t: Tri) {
-        assert!(self.triangle_count < N);
-
-        self.triangles[self.triangle_count] = t;
-        self.triangle_indexs[self.triangle_count] = self.triangle_count;
-        self.triangle_count += 1;
-    }
-
-    fn update_node_bounds(&mut self, nodeIdx: usize) {
-        let mut node = &mut self.nodes[nodeIdx];
+    fn update_node_bounds(&mut self, nodeIdx: usize, triangles: &Vec<Tri>) {
+        let node = &mut self.nodes[nodeIdx];
         node.aabb_min = Vec3::splat(1e30f32);
         node.aabb_max = Vec3::splat(-1e30f32);
-        for i in node.first_triangle..node.triangle_count {
-            let leafTri = &self.triangles[(node.first_triangle + i) as usize];
+        for i in 0..node.tri_count {
+            let leaf_tri_index = self.triangle_indexs[(node.first_tri_index + i) as usize];
+            let leafTri = triangles[leaf_tri_index];
             node.aabb_min = node.aabb_min.min(leafTri.vertex0);
             node.aabb_min = node.aabb_min.min(leafTri.vertex1);
             node.aabb_min = node.aabb_min.min(leafTri.vertex2);
@@ -78,14 +60,14 @@ impl Bvh {
         }
     }
 
-    fn subdivide_node(&mut self, nodeIdx: usize) {
+    fn subdivide_node(&mut self, nodeIdx: usize, triangles: &Vec<Tri>) {
         // terminate recursion
-
-        if self.nodes[nodeIdx].triangle_count <= 2 {
+        let node = &mut self.nodes[nodeIdx];
+        if node.tri_count <= 2 {
             return;
         }
         // determine split axis and position
-        let extent = self.nodes[nodeIdx].aabb_max - self.nodes[nodeIdx].aabb_min;
+        let extent = node.aabb_max - node.aabb_min;
         let mut axis = 0;
         if extent.y > extent.x {
             axis = 1;
@@ -93,12 +75,12 @@ impl Bvh {
         if extent.z > extent[axis] {
             axis = 2;
         }
-        let splitPos = self.nodes[nodeIdx].aabb_min[axis] + extent[axis] * 0.5f32;
+        let splitPos = node.aabb_min[axis] + extent[axis] * 0.5f32;
         // in-place partition
-        let mut i = self.nodes[nodeIdx].first_triangle;
-        let mut j = i + self.nodes[nodeIdx].triangle_count - 1;
+        let mut i = node.first_tri_index;
+        let mut j = i + node.tri_count - 1;
         while (i <= j) {
-            if self.triangles[self.triangle_indexs[i as usize] as usize].centroid[axis] < splitPos {
+            if triangles[self.triangle_indexs[i as usize]].centroid[axis] < splitPos {
                 i += 1;
             } else {
                 self.triangle_indexs.swap(i as usize, j as usize);
@@ -106,44 +88,46 @@ impl Bvh {
             }
         }
         // abort split if one of the sides is empty
-        let leftCount = i - self.nodes[nodeIdx].first_triangle;
-        if (leftCount == 0 || leftCount == self.nodes[nodeIdx].triangle_count) {
+        let leftCount = i - node.first_tri_index;
+        if (leftCount == 0 || leftCount == node.tri_count) {
             return;
         }
         // create child nodes
-        let leftChildIdx = self.nodesUsed;
-        self.nodesUsed += 1;
-        let rightChildIdx = self.nodesUsed;
-        self.nodesUsed += 1;
+        let leftChildIdx = self.open_node as u32;
+        self.open_node += 1;
+        let rightChildIdx = self.open_node as u32;
+        self.open_node += 1;
 
-        self.nodes[nodeIdx].left_child = leftChildIdx;
+        node.left_child = leftChildIdx;
 
-        self.nodes[leftChildIdx as usize].first_triangle = self.nodes[nodeIdx].first_triangle;
-        self.nodes[leftChildIdx as usize].triangle_count = leftCount;
-        self.nodes[rightChildIdx as usize].first_triangle = i;
-        self.nodes[rightChildIdx as usize].triangle_count = self.nodes[nodeIdx].triangle_count - leftCount;
+        self.nodes[leftChildIdx as usize].first_tri_index = node.first_tri_index;
+        self.nodes[leftChildIdx as usize].tri_count = leftCount;
+        self.nodes[rightChildIdx as usize].first_tri_index = i;
+        self.nodes[rightChildIdx as usize].tri_count = self.nodes[nodeIdx].tri_count - leftCount;
 
-        self.nodes[nodeIdx].triangle_count = 0;
+        self.nodes[nodeIdx].tri_count = 0;
 
-        self.update_node_bounds(leftChildIdx as usize);
-        self.update_node_bounds(rightChildIdx as usize);
+        self.update_node_bounds(leftChildIdx as usize, triangles);
+        self.update_node_bounds(rightChildIdx as usize, triangles);
         // recurse
-        self.subdivide_node(leftChildIdx as usize);
-        self.subdivide_node(rightChildIdx as usize);
+        self.subdivide_node(leftChildIdx as usize, triangles);
+        self.subdivide_node(rightChildIdx as usize, triangles);
     }
 
-    pub fn intersect(&self, ray: &mut Ray, nodeIdx: u32) {
+    pub fn intersect(&self, ray: &mut Ray, nodeIdx: u32, triangles: &Vec<Tri>) {
         let node = &self.nodes[nodeIdx as usize];
         if !ray.intersect_aabb(node.aabb_min, node.aabb_max) {
             return;
         }
         if node.is_leaf() {
-            for i in 0..node.triangle_count {
-                ray.intersect_triangle(&self.triangles[node.first_triangle as usize + i as usize]);
+            for i in 0..node.tri_count {
+                if ray.intersect_triangle(&triangles[(node.first_tri_index + i) as usize]) {
+                    print!("{} {:?}", i, ray);
+                }
             }
         } else {
-            self.intersect(ray, node.left_child);
-            self.intersect(ray, node.left_child + 1);
+            self.intersect(ray, node.left_child, triangles);
+            self.intersect(ray, node.left_child + 1, triangles);
         }
     }
 }
