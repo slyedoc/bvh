@@ -1,6 +1,6 @@
 use glam::Vec3;
 
-#[derive(Default, Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone)]
 pub struct Tri {
     pub vertex0: Vec3,
     pub vertex1: Vec3,

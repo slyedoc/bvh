@@ -5,7 +5,7 @@ use crate::{ray::Ray, tri::Tri};
 
 #[derive(Default, Debug, Copy, Clone)]
 pub struct BvhNode {
-    aabb_min: Vec3,
+    pub aabb_min: Vec3,
     aabb_max: Vec3,
     left_child: u32,
     first_tri_index: u32,
@@ -61,11 +61,13 @@ impl Bvh {
     }
 
     fn subdivide_node(&mut self, nodeIdx: usize, triangles: &Vec<Tri>) {
-        // terminate recursion
+        
         let node = &mut self.nodes[nodeIdx];
+        // terminate recursion
         if node.tri_count <= 2 {
             return;
         }
+
         // determine split axis and position
         let extent = node.aabb_max - node.aabb_min;
         let mut axis = 0;
@@ -100,7 +102,7 @@ impl Bvh {
 
         node.left_child = leftChildIdx;
 
-        self.nodes[leftChildIdx as usize].first_tri_index = node.first_tri_index;
+        self.nodes[leftChildIdx as usize].first_tri_index = self.nodes[nodeIdx].first_tri_index;
         self.nodes[leftChildIdx as usize].tri_count = leftCount;
         self.nodes[rightChildIdx as usize].first_tri_index = i;
         self.nodes[rightChildIdx as usize].tri_count = self.nodes[nodeIdx].tri_count - leftCount;
@@ -115,17 +117,19 @@ impl Bvh {
     }
 
     pub fn intersect(&self, ray: &mut Ray, nodeIdx: u32, triangles: &Vec<Tri>) {
+
         let node = &self.nodes[nodeIdx as usize];
         if !ray.intersect_aabb(node.aabb_min, node.aabb_max) {
             return;
         }
+
+        let mut list = Vec::<u32>::new();
         if node.is_leaf() {
             for i in 0..node.tri_count {
-                if ray.intersect_triangle(&triangles[(node.first_tri_index + i) as usize]) {
-                    print!("{} {:?}", i, ray);
-                }
+                ray.intersect_triangle(&triangles[self.triangle_indexs[(node.first_tri_index + i) as usize]]);                    
             }
         } else {
+
             self.intersect(ray, node.left_child, triangles);
             self.intersect(ray, node.left_child + 1, triangles);
         }
