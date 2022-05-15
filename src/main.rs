@@ -45,7 +45,7 @@ struct Args {
 fn main() {
     let args = Args::parse();
     println!("{:?}", args);
-    //println!("BVHNode mem size: {} bytes", std::mem::size_of::<BvhNode>());
+    println!("BVHNode mem size: {} bytes", std::mem::size_of::<BvhNode>());
 
     // Camera
     let camera = Camera::new(
@@ -68,16 +68,6 @@ fn main() {
         let bvh_setup = Instant::now();
         bvh.setup(&tris);
         println!("Bvh Setup: {:?}", bvh_setup.elapsed());
-        for (i, t) in tris.iter().enumerate() {
-            println!("{i} Tris, centrpod {:?}", t.centroid);
-        }
-
-        for (i, n) in bvh.nodes.iter().enumerate() {
-            if n.aabb_min != Vec3::ZERO {
-                println!("{i} {:?}", n);
-            }
-        }
-
         Some(&bvh)
     } else {
         None

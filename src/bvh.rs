@@ -7,7 +7,7 @@ use crate::{ray::Ray, tri::Tri};
 pub struct BvhNode {
     pub aabb_min: Vec3,
     aabb_max: Vec3,
-    left_child: u32,
+    left_first: u32,
     first_tri_index: u32,
     tri_count: u32,
 }
@@ -36,7 +36,7 @@ impl Bvh {
     /// Builds a BVH from a list of triangles added
     pub fn setup(&mut self, triangles: &Vec<Tri>) {
         let root = &mut self.nodes[0];
-        root.left_child = 0;
+        root.left_first = 0;
         root.first_tri_index = 0;
         root.tri_count = triangles.len() as u32;
 
@@ -100,7 +100,7 @@ impl Bvh {
         let rightChildIdx = self.open_node as u32;
         self.open_node += 1;
 
-        node.left_child = leftChildIdx;
+        node.left_first = leftChildIdx;
 
         self.nodes[leftChildIdx as usize].first_tri_index = self.nodes[nodeIdx].first_tri_index;
         self.nodes[leftChildIdx as usize].tri_count = leftCount;
@@ -130,8 +130,8 @@ impl Bvh {
             }
         } else {
 
-            self.intersect(ray, node.left_child, triangles);
-            self.intersect(ray, node.left_child + 1, triangles);
+            self.intersect(ray, node.left_first, triangles);
+            self.intersect(ray, node.left_first + 1, triangles);
         }
     }
 }
