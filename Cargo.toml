@@ -1,15 +1,22 @@
 [package]
-name = "bvh"
+name = "bvh_tutorial"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 rand = "0.8.5"
+rand_chacha = "0.3.1"
 image = "0.24.2"
 glam = "0.20.5"
-rayon = "1.5"
-indicatif = "0.16.2"
-rand_chacha = "0.3.1"
 clap = { version = "3.1.18", features = ["derive"] }
+
+# Not using currently
+#rayon = "1.5" 
+#indicatif = "0.16.2"
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "t1"
+harness = false

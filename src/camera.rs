@@ -1,51 +1,58 @@
 use glam::Vec3;
 
-use crate::ray::Ray;
-
 pub struct Camera {
     pub position: Vec3,
-    lower_left_corner: Vec3,
-    horizontal: Vec3,
-    vertical: Vec3,
-    u: Vec3,
-    v: Vec3,
-    w: Vec3,
+    pub lower_left_corner: Vec3,
+    pub horizontal: Vec3,
+    pub vertical: Vec3,
+    pub u: Vec3,
+    pub v: Vec3,
+    pub w: Vec3,
+    pub width: u32,
+    pub height: u32,
+    pub x_step: Vec3,
+    pub y_step: Vec3,
 }
 
 impl Camera {
     pub fn new(
-        look_from: Vec3,
+        width: u32,
+        height: u32,
+        position: Vec3,
         look_at: Vec3,
-        vup: Vec3,
-        vfov: f32, // vertical field of view
-        aspect_ratio: f32,
+        vup: Vec3,       
+        fov: f32, // in degrees
     ) -> Self {
-        let theta = vfov * std::f32::consts::PI / 180.0;
+        let aspect_ratio = width as f32 / height as f32;
+        let theta = fov * std::f32::consts::PI / 180.0;
         let half_height = (theta / 2.0).tan();
         let viewport_height = 2.0 * half_height;
         let viewport_width = aspect_ratio * viewport_height;
 
-        let w = (look_from - look_at).normalize();
+        let w = (position - look_at).normalize();
         let u = vup.cross(w).normalize();
         let v = w.cross(u);
 
-        let origin = look_from;
         let horizontal = viewport_width * u;
         let vertical = viewport_height * v;
+        
+        let lower_left_corner = position - horizontal / 2.0 - vertical / 2.0 - w;
+        let x_step = horizontal / width as f32;
+        let y_step = vertical / height as f32;
 
         Self {
-            position: origin,
+            width,
+            height,
+            position,
             vertical,
             horizontal,
-            lower_left_corner: origin - horizontal / 2.0 - vertical / 2.0 - w,
+            lower_left_corner,
             w,
             u,
             v,
+            x_step,
+            y_step,
         }
     }
 
-    pub fn get_direction(&self, u: f32, v: f32) -> Vec3 {
-        (self.lower_left_corner + u * self.horizontal + v * self.vertical - self.position)
-            .normalize()
-    }
 }

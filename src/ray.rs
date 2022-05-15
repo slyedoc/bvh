@@ -1,6 +1,6 @@
 use glam::Vec3;
 
-use crate::{tri::Tri, bvh::Bvh};
+use crate::{tri::Tri};
 
 #[derive(Debug)]
 pub struct Ray {
@@ -65,10 +65,5 @@ impl Ray {
         let tmin = tmin.max(tz1.min(tz2));
         let tmax = tmax.min(tz1.max(tz2));
         return tmax >= tmin && tmin < self.t && tmax > 0.0;
-    }
-
-    // keeping logic interal to bvh, but wanted conistent way use ray
-    pub fn intersect_bvh(&mut self, bvh: &Bvh, nodeIdx: u32, triangles: &Vec<Tri>) {
-        bvh.intersect(self, nodeIdx, triangles);
     }
 }
